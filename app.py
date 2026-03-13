@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 # --- 1. IMPORTAZIONE CONNESSA A GOOGLE SHEETS ---
 try:
-    from st_gsheets_connection import GSheetsConnection
+    from streamlit_gsheets_connection import GSheetsConnection
 except ImportError:
     st.error("⚠️ Il modulo 'st-gsheets-connection' non è installato. Verifica il file requirements.txt e riavvia l'app.")
     st.stop()
