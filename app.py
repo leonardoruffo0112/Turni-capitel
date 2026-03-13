@@ -122,3 +122,21 @@ with tab2:
                 scelti = esperti_disp[:n_exp]
                 
                 # Riempire il resto (Esperti restanti + Base)
+                restanti_disp = [n for n in disponibili if n not in scelti]
+                restanti_disp.sort(key=lambda x: carico_lavoro[x])
+                
+                posti_mancanti = n_tot - len(scelti)
+                scelti.extend(restanti_disp[:posti_mancanti])
+                
+                for s in scelti: carico_lavoro[s] += 1
+                
+                results.append({"Data": date_str, "Giorno": day_key, "Turno": fascia, "Chi": ", ".join(scelti)})
+        
+        st.subheader("Tabellone Risultante")
+        st.table(pd.DataFrame(results))
+        st.write("Bilanciamento finale:", carico_lavoro)
+
+    st.divider()
+    if st.button("🗑️ AZZERA TUTTO"):
+        conn.update(worksheet="indisponibilita", data=pd.DataFrame(columns=["Nome", "Data", "Turno"]))
+        st.warning("Database pulito.")
