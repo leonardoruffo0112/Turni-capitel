@@ -64,7 +64,7 @@ with tab1:
             for _, row in df_miei.iterrows():
                 miei_turni_salvati.add(f"{row['Data']}-{row['Turno']}")
                 
-            if non df_miei.empty:
+            if not df_miei.empty:
                 st.info("Abbiamo caricato le tue indisponibilità precedenti. Puoi modificarle togliendo o mettendo le spunte.")
         except:
             pass # Se il foglio è vuoto, ignoriamo l'errore
