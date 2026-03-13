@@ -55,14 +55,12 @@ with tab1:
         mese, anno = 4, 2026
         st.success(f"Accesso consentito. Ciao {user}!")
         
-        # 1. RECUPERO MEMORIA CON CACHE DISATTIVATA
         miei_turni_salvati = set()
         try:
             df_tutti = conn.read(worksheet="indisponibilita", ttl=0)
             df_miei = df_tutti[df_tutti['Nome'] == user]
             
             for _, row in df_miei.iterrows():
-                # Forziamo a stringa per aggirare i formati strani di Google
                 data_pulita = str(row['Data']).strip()
                 turno_pulito = str(row['Turno']).strip()
                 miei_turni_salvati.add(f"{data_pulita}-{turno_pulito}")
@@ -113,7 +111,7 @@ with tab1:
                 updated_df = pd.concat([df_old, new_rows], ignore_index=True)
                 conn.update(worksheet="indisponibilita", data=updated_df)
                 
-                st.cache_data.clear() # Svuota la cache visiva
+                st.cache_data.clear() 
                 st.success("Tutto aggiornato correttamente nel database!")
             except Exception as e:
                 st.error(f"Errore durante il salvataggio: {e}")
@@ -128,19 +126,61 @@ with tab2:
     if admin_pin_inserito == PIN_ADMIN:
         st.header("Area Amministratore (Sbloccata)")
         
+        mese, anno = 4, 2026
+        month_days = [d for d in get_calendar_days(mese, anno) if d.month == mese]
+        
         try:
             df_indisp = conn.read(worksheet="indisponibilita", ttl=0)
-            st.write(f"Dati raccolti: {len(df_indisp)} impegni segnati dallo staff.")
-            st.dataframe(df_indisp, use_container_width=True)
         except:
             df_indisp = pd.DataFrame(columns=["Nome", "Data", "Turno"])
-            st.write("Database attualmente vuoto.")
 
-        if st.button("🚀 GENERA TURNI DEL MESE"):
+        # --- SEZIONE DISPONIBILITA' E CONTEGGIO ---
+        st.subheader("Riepilogo Disponibilità")
+        
+        dati_disponibili = []
+        conteggio_disp = {n: 0 for n in STAFF_NAMES}
+        
+        for d in month_days:
+            date_str = d.strftime("%d/%m")
+            day_key = d.strftime("%a")
+            config = REQUISITI_SETTIMANA.get(day_key, {})
+            
+            for fascia in config.keys():
+                if not df_indisp.empty:
+                    occupati = df_indisp[(df_indisp['Data'] == date_str) & (df_indisp['Turno'] == fascia)]['Nome'].tolist()
+                else:
+                    occupati = []
+                    
+                disponibili = [n for n in STAFF_NAMES if n not in occupati]
+                
+                for n in disponibili:
+                    conteggio_disp[n] += 1
+                    
+                dati_disponibili.append({
+                    "Data": date_str,
+                    "Turno": fascia,
+                    "Staff Disponibile": ", ".join(disponibili)
+                })
+                
+        df_disp = pd.DataFrame(dati_disponibili)
+        df_conteggio = pd.DataFrame(list(conteggio_disp.items()), columns=['Lettera', 'Turni Liberi']).sort_values(by='Turni Liberi', ascending=False)
+        
+        col_tab, col_count = st.columns([3, 1])
+        
+        with col_tab:
+            st.write("Vista: Chi può lavorare")
+            st.dataframe(df_disp, use_container_width=True, height=400)
+            
+        with col_count:
+            st.write("Contatore Disponibilità")
+            st.dataframe(df_conteggio, use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        # --- SEZIONE GENERAZIONE TURNI ---
+        if st.button("🚀 GENERA TURNI DEL MESE", type="primary"):
             results = []
             carico_lavoro = {name: 0 for name in STAFF_NAMES}
-            mese, anno = 4, 2026
-            month_days = [d for d in get_calendar_days(mese, anno) if d.month == mese]
 
             for d in month_days:
                 date_str = d.strftime("%d/%m")
@@ -163,11 +203,14 @@ with tab2:
                     scelti.extend(restanti_disp[:mancanti])
                     
                     for s in scelti: carico_lavoro[s] += 1
-                    results.append({"Data": date_str, "Turno": fascia, "Staff": ", ".join(scelti)})
+                    results.append({"Data": date_str, "Turno": fascia, "Assegnati": ", ".join(scelti)})
             
             st.subheader("Tabellone Generato")
             st.table(pd.DataFrame(results))
-            st.write("Totale turni assegnati per persona:", carico_lavoro)
+            
+            df_lavoro_finale = pd.DataFrame(list(carico_lavoro.items()), columns=['Lettera', 'Turni Assegnati']).sort_values(by='Turni Assegnati', ascending=False)
+            st.write("Contatore Turni Effettivi (Assegnati dall'algoritmo):")
+            st.dataframe(df_lavoro_finale, hide_index=True)
 
         st.divider()
         if st.button("🗑️ RESET DATABASE (NUOVO MESE)"):
