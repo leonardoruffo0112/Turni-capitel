@@ -1,14 +1,11 @@
 import streamlit as st
 import pandas as pd
-import random
 from datetime import datetime, timedelta
 
-# --- 1. IMPORTAZIONE CONNESSA A GOOGLE SHEETS ---
-try:
-    from streamlit_gsheets_connection import GSheetsConnection
-except ImportError:
-    st.error("⚠️ Il modulo 'st-gsheets-connection' non è installato. Verifica il file requirements.txt e riavvia l'app.")
-    st.stop()
+# Importazione corretta per il codice
+from streamlit_gsheets import GSheetsConnection
+
+# ... il resto del tuo codice da qui in poi ...
 
 # --- 2. CONFIGURAZIONE E REGOLE ---
 st.set_page_config(page_title="Turni Capitel", layout="wide")
