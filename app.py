@@ -27,6 +27,7 @@ STAFF_INFO = {
 }
 STAFF_NAMES = list(STAFF_INFO.keys())
 
+# Fabbisogno settimanale
 REQUISITI_SETTIMANA = {
     'Mon': {'C': (3, 0)}, 'Tue': {'C': (2, 0)}, 'Wed': {'C': (3, 0)}, 
     'Thu': {'C': (4, 0)}, 'Fri': {'C': (4, 0)}, 
@@ -178,7 +179,7 @@ with tab2:
         st.divider()
 
         # --- SEZIONE GENERAZIONE TURNI ---
-        if st.button("🚀 GENERA TURNI DEL MESE", type="primary"):
+        if st.button("🚀 GENERA E SALVA TURNI DEL MESE", type="primary"):
             results = []
             carico_lavoro = {name: 0 for name in STAFF_NAMES}
 
@@ -205,9 +206,20 @@ with tab2:
                     for s in scelti: carico_lavoro[s] += 1
                     results.append({"Data": date_str, "Turno": fascia, "Assegnati": ", ".join(scelti)})
             
+            # --- MOSTRA A SCHERMO ---
             st.subheader("Tabellone Generato")
-            st.table(pd.DataFrame(results))
+            df_risultato_finale = pd.DataFrame(results)
+            st.table(df_risultato_finale)
             
+            # --- ESPORTA SU GOOGLE SHEETS ---
+            try:
+                # Sovrascrive i dati nella linguetta Tabellone
+                conn.update(worksheet="Tabellone", data=df_risultato_finale)
+                st.success("✅ Tabellone esportato con successo su Google Sheets nella scheda 'Tabellone'!")
+            except Exception as e:
+                st.error(f"❌ Errore di esportazione: assicurati di aver creato una linguetta chiamata 'Tabellone' su Google Sheets. Errore tecnico: {e}")
+
+            # --- CONTATORI ---
             df_lavoro_finale = pd.DataFrame(list(carico_lavoro.items()), columns=['Lettera', 'Turni Assegnati']).sort_values(by='Turni Assegnati', ascending=False)
             st.write("Contatore Turni Effettivi (Assegnati dall'algoritmo):")
             st.dataframe(df_lavoro_finale, hide_index=True)
