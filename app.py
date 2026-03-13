@@ -55,19 +55,22 @@ with tab1:
         mese, anno = 4, 2026
         st.success(f"Accesso consentito. Ciao {user}!")
         
-        # 1. RECUPERO LA MEMORIA STORICA DELL'UTENTE
+        # 1. RECUPERO MEMORIA CON CACHE DISATTIVATA
         miei_turni_salvati = set()
         try:
-            df_tutti = conn.read(worksheet="indisponibilita")
+            df_tutti = conn.read(worksheet="indisponibilita", ttl=0)
             df_miei = df_tutti[df_tutti['Nome'] == user]
-            # Creo un elenco facile da leggere per il codice (es. "14/04-C")
+            
             for _, row in df_miei.iterrows():
-                miei_turni_salvati.add(f"{row['Data']}-{row['Turno']}")
+                # Forziamo a stringa per aggirare i formati strani di Google
+                data_pulita = str(row['Data']).strip()
+                turno_pulito = str(row['Turno']).strip()
+                miei_turni_salvati.add(f"{data_pulita}-{turno_pulito}")
                 
             if not df_miei.empty:
                 st.info("Abbiamo caricato le tue indisponibilità precedenti. Puoi modificarle togliendo o mettendo le spunte.")
-        except:
-            pass # Se il foglio è vuoto, ignoriamo l'errore
+        except Exception as e:
+            pass 
 
         st.subheader(f"I tuoi impegni per Aprile")
 
@@ -91,11 +94,9 @@ with tab1:
                         
                         st.write(f"**{date_str}**")
                         for t in list(REQUISITI_SETTIMANA[day_key].keys()):
-                            # 2. VERIFICA SE LA CASELLA DEVE ESSERE GIÀ SPUNTATA
                             id_turno_corrente = f"{date_str}-{t}"
                             gia_selezionato = id_turno_corrente in miei_turni_salvati
                             
-                            # La checkbox prende il valore 'gia_selezionato' (True o False)
                             if st.checkbox(f"{t}", value=gia_selezionato, key=f"{user}_{day.day}_{t}"):
                                 current_user_nos.append({"Nome": user, "Data": date_str, "Turno": t})
                     else: st.write("")
@@ -103,16 +104,16 @@ with tab1:
         if st.button("CONFERMA MODIFICHE E SALVA", type="primary"):
             try:
                 try:
-                    df_old = conn.read(worksheet="indisponibilita")
-                    # Cancelliamo tutti i vecchi dati di questo utente
+                    df_old = conn.read(worksheet="indisponibilita", ttl=0)
                     df_old = df_old[df_old['Nome'] != user] 
                 except:
                     df_old = pd.DataFrame(columns=["Nome", "Data", "Turno"])
                 
-                # Inseriamo i nuovi dati (che includono i vecchi non deselezionati + le nuove aggiunte)
                 new_rows = pd.DataFrame(current_user_nos)
                 updated_df = pd.concat([df_old, new_rows], ignore_index=True)
                 conn.update(worksheet="indisponibilita", data=updated_df)
+                
+                st.cache_data.clear() # Svuota la cache visiva
                 st.success("Tutto aggiornato correttamente nel database!")
             except Exception as e:
                 st.error(f"Errore durante il salvataggio: {e}")
@@ -128,7 +129,7 @@ with tab2:
         st.header("Area Amministratore (Sbloccata)")
         
         try:
-            df_indisp = conn.read(worksheet="indisponibilita")
+            df_indisp = conn.read(worksheet="indisponibilita", ttl=0)
             st.write(f"Dati raccolti: {len(df_indisp)} impegni segnati dallo staff.")
             st.dataframe(df_indisp, use_container_width=True)
         except:
@@ -171,6 +172,7 @@ with tab2:
         st.divider()
         if st.button("🗑️ RESET DATABASE (NUOVO MESE)"):
             conn.update(worksheet="indisponibilita", data=pd.DataFrame(columns=["Nome", "Data", "Turno"]))
+            st.cache_data.clear()
             st.warning("Database pulito.")
             
     elif admin_pin_inserito != "":
