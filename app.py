@@ -27,13 +27,15 @@ STAFF_INFO = {
 }
 STAFF_NAMES = list(STAFF_INFO.keys())
 
-# Fabbisogno settimanale
 REQUISITI_SETTIMANA = {
     'Mon': {'C': (3, 0)}, 'Tue': {'C': (2, 0)}, 'Wed': {'C': (3, 0)}, 
     'Thu': {'C': (4, 0)}, 'Fri': {'C': (4, 0)}, 
     'Sat': {'P': (3, 0), 'C': (6, 2)},
     'Sun': {'P': (5, 2), 'C': (4, 0)}
 }
+
+# Dizionario per tradurre i giorni come sul foglio di carta
+GIORNI_IT = {0: 'L', 1: 'M', 2: 'M', 3: 'G', 4: 'V', 5: 'S', 6: 'D'}
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -135,7 +137,7 @@ with tab2:
         except:
             df_indisp = pd.DataFrame(columns=["Nome", "Data", "Turno"])
 
-        # --- SEZIONE DISPONIBILITA' E CONTEGGIO ---
+        # --- SEZIONE DISPONIBILITA' ---
         st.subheader("Riepilogo Disponibilità")
         
         dati_disponibili = []
@@ -178,11 +180,18 @@ with tab2:
 
         st.divider()
 
-        # --- SEZIONE GENERAZIONE TURNI ---
+        # --- SEZIONE GENERAZIONE TURNI FORMATO CARTA ---
         if st.button("🚀 GENERA E SALVA TURNI DEL MESE", type="primary"):
-            results = []
             carico_lavoro = {name: 0 for name in STAFF_NAMES}
+            
+            # Prepariamo la struttura vuota simile al foglio di carta
+            tabellone_mese = {}
+            for d in month_days:
+                iniziale_giorno = GIORNI_IT[d.weekday()]
+                etichetta_giorno = f"{iniziale_giorno} {d.day}"
+                tabellone_mese[d.day] = {"Giorno": etichetta_giorno, "CENA": "", "PRANZO": ""}
 
+            # Calcolo assegnazioni
             for d in month_days:
                 date_str = d.strftime("%d/%m")
                 day_key = d.strftime("%a")
@@ -204,16 +213,26 @@ with tab2:
                     scelti.extend(restanti_disp[:mancanti])
                     
                     for s in scelti: carico_lavoro[s] += 1
-                    results.append({"Data": date_str, "Turno": fascia, "Assegnati": ", ".join(scelti)})
+                    
+                    # Uniamo le lettere senza virgole come nel foglio cartaceo
+                    colonna_destinazione = "CENA" if fascia == 'C' else "PRANZO"
+                    tabellone_mese[d.day][colonna_destinazione] = "".join(scelti)
             
-            # --- MOSTRA A SCHERMO ---
+            df_risultato_finale = pd.DataFrame(list(tabellone_mese.values()))
+            
+            # --- MOSTRA A SCHERMO CON DOMENICHE EVIDENZIATE ---
             st.subheader("Tabellone Generato")
-            df_risultato_finale = pd.DataFrame(results)
-            st.table(df_risultato_finale)
+            
+            # Funzione per colorare le domeniche
+            def highlight_dom(row):
+                if row['Giorno'].startswith('D'):
+                    return ['background-color: #4a1515; font-weight: bold'] * len(row)
+                return [''] * len(row)
+                
+            st.dataframe(df_risultato_finale.style.apply(highlight_dom, axis=1), use_container_width=True, hide_index=True)
             
             # --- ESPORTA SU GOOGLE SHEETS ---
             try:
-                # Sovrascrive i dati nella linguetta Tabellone
                 conn.update(worksheet="Tabellone", data=df_risultato_finale)
                 st.success("✅ Tabellone esportato con successo su Google Sheets nella scheda 'Tabellone'!")
             except Exception as e:
