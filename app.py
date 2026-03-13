@@ -12,13 +12,12 @@ except ImportError:
 st.set_page_config(page_title="Turni Capitel", layout="wide")
 
 # --- DATABASE PIN E STAFF ---
-# Sostituisci questi PIN con quelli che darai ai ragazzi
 PIN_STAFF = {
     'L': '1111', 'N': '2222', 'J': '3333', 'A': '4444', 
     'B': '5555', 'C': '6666', 'D': '7777', 'M': '8888', 
     'P': '9999', 'T': '1234', 'Z': '4321'
 }
-PIN_ADMIN = "0000" # La TUA password per creare i turni
+PIN_ADMIN = "0000" 
 
 STAFF_INFO = {
     'L': {'exp': True}, 'N': {'exp': True}, 'J': {'exp': True},
@@ -46,28 +45,31 @@ st.title("🗓️ Gestione Turni Capitel")
 
 tab1, tab2 = st.tabs(["❌ Segna i tuoi impegni", "⚙️ Admin & Generatore"])
 
-# --- TAB 1: AREA RAGAZZI (PROTETTA DA PIN) ---
+# --- TAB 1: AREA RAGAZZI ---
 with tab1:
     col1, col2 = st.columns(2)
     user = col1.selectbox("Seleziona il tuo nome", STAFF_NAMES)
     pin_inserito = col2.text_input("Inserisci il tuo PIN", type="password")
     
-    # Il calendario appare SOLO se il PIN è corretto
     if pin_inserito == PIN_STAFF[user]:
         mese, anno = 4, 2026
         st.success(f"Accesso consentito. Ciao {user}!")
         
-        # Mostriamo i dati già inseriti da questo utente
+        # 1. RECUPERO LA MEMORIA STORICA DELL'UTENTE
+        miei_turni_salvati = set()
         try:
             df_tutti = conn.read(worksheet="indisponibilita")
-            miei_dati = df_tutti[df_tutti['Nome'] == user]
-            if not miei_dati.empty:
-                st.info(f"Hai già segnalato {len(miei_dati)} turni di indisponibilità. Se salvi di nuovo, sovrascriverai i dati precedenti.")
+            df_miei = df_tutti[df_tutti['Nome'] == user]
+            # Creo un elenco facile da leggere per il codice (es. "14/04-C")
+            for _, row in df_miei.iterrows():
+                miei_turni_salvati.add(f"{row['Data']}-{row['Turno']}")
+                
+            if non df_miei.empty:
+                st.info("Abbiamo caricato le tue indisponibilità precedenti. Puoi modificarle togliendo o mettendo le spunte.")
         except:
-            pass # Il foglio potrebbe essere vuoto la prima volta
+            pass # Se il foglio è vuoto, ignoriamo l'errore
 
         st.subheader(f"I tuoi impegni per Aprile")
-        st.write("Spunta i turni in cui NON puoi lavorare (P=Pranzo, C=Cena).")
 
         days = get_calendar_days(mese, anno)
         weekdays_labels = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"]
@@ -89,29 +91,36 @@ with tab1:
                         
                         st.write(f"**{date_str}**")
                         for t in list(REQUISITI_SETTIMANA[day_key].keys()):
-                            if st.checkbox(f"{t}", key=f"{user}_{day.day}_{t}"):
+                            # 2. VERIFICA SE LA CASELLA DEVE ESSERE GIÀ SPUNTATA
+                            id_turno_corrente = f"{date_str}-{t}"
+                            gia_selezionato = id_turno_corrente in miei_turni_salvati
+                            
+                            # La checkbox prende il valore 'gia_selezionato' (True o False)
+                            if st.checkbox(f"{t}", value=gia_selezionato, key=f"{user}_{day.day}_{t}"):
                                 current_user_nos.append({"Nome": user, "Data": date_str, "Turno": t})
                     else: st.write("")
 
-        if st.button("CONFERMA E SALVA", type="primary"):
+        if st.button("CONFERMA MODIFICHE E SALVA", type="primary"):
             try:
                 try:
                     df_old = conn.read(worksheet="indisponibilita")
+                    # Cancelliamo tutti i vecchi dati di questo utente
                     df_old = df_old[df_old['Nome'] != user] 
                 except:
                     df_old = pd.DataFrame(columns=["Nome", "Data", "Turno"])
                 
+                # Inseriamo i nuovi dati (che includono i vecchi non deselezionati + le nuove aggiunte)
                 new_rows = pd.DataFrame(current_user_nos)
                 updated_df = pd.concat([df_old, new_rows], ignore_index=True)
                 conn.update(worksheet="indisponibilita", data=updated_df)
-                st.success("Impegni salvati con successo nel database!")
+                st.success("Tutto aggiornato correttamente nel database!")
             except Exception as e:
-                st.error(f"Errore di connessione: {e}")
+                st.error(f"Errore durante il salvataggio: {e}")
                 
     elif pin_inserito != "":
         st.error("PIN errato. Riprova.")
 
-# --- TAB 2: AREA ADMIN (PROTETTA DA PIN MASTER) ---
+# --- TAB 2: AREA ADMIN ---
 with tab2:
     admin_pin_inserito = st.text_input("Inserisci PIN Amministratore per accedere", type="password")
     
@@ -121,7 +130,6 @@ with tab2:
         try:
             df_indisp = conn.read(worksheet="indisponibilita")
             st.write(f"Dati raccolti: {len(df_indisp)} impegni segnati dallo staff.")
-            # L'admin può vedere tutto
             st.dataframe(df_indisp, use_container_width=True)
         except:
             df_indisp = pd.DataFrame(columns=["Nome", "Data", "Turno"])
@@ -130,7 +138,8 @@ with tab2:
         if st.button("🚀 GENERA TURNI DEL MESE"):
             results = []
             carico_lavoro = {name: 0 for name in STAFF_NAMES}
-            month_days = [d for d in get_calendar_days(mese, anno) if d.month == mese] # Usa mese corrente dal tab1
+            mese, anno = 4, 2026
+            month_days = [d for d in get_calendar_days(mese, anno) if d.month == mese]
 
             for d in month_days:
                 date_str = d.strftime("%d/%m")
@@ -162,7 +171,7 @@ with tab2:
         st.divider()
         if st.button("🗑️ RESET DATABASE (NUOVO MESE)"):
             conn.update(worksheet="indisponibilita", data=pd.DataFrame(columns=["Nome", "Data", "Turno"]))
-            st.warning("Database pulito. I colleghi possono inserire i dati per il nuovo mese.")
+            st.warning("Database pulito.")
             
     elif admin_pin_inserito != "":
         st.error("Accesso negato.")
