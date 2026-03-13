@@ -28,7 +28,7 @@ STAFF_INFO = {
 STAFF_NAMES = list(STAFF_INFO.keys())
 
 REQUISITI_SETTIMANA = {
-    'Mon': {'C': (3, 0)}, 'Tue': {'C': (2, 0)}, 'Wed': {'C': (3, 0)}, 
+    'Mon': {'C': (3, 0)}, 'Tue': {'C': (3, 0)}, 'Wed': {'C': (3, 0)}, 
     'Thu': {'C': (4, 0)}, 'Fri': {'C': (4, 0)}, 
     'Sat': {'P': (3, 0), 'C': (6, 2)},
     'Sun': {'P': (5, 2), 'C': (4, 0)}
