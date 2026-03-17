@@ -39,7 +39,7 @@ STAFF_NAMES = list(STAFF_INFO.keys())
 # Formato: (Numero Totale, Numero Esperti, Numero Baristi)
 REQUISITI_SETTIMANA = {
     'Mon': {'C': (3, 1, 1)}, 
-    'Tue': {'C': (2, 1, 1)}, 
+    'Tue': {'C': (3, 1, 1)}, 
     'Wed': {'C': (3, 1, 0)}, 
     'Thu': {'C': (4, 1, 1)}, 
     'Fri': {'C': (4, 2, 0)}, # 0 Baristi di Venerdì come da tua richiesta
