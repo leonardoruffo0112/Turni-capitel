@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import random
 from datetime import datetime, timedelta
 
 # --- IMPORTAZIONE UFFICIALE ---
@@ -19,19 +20,36 @@ PIN_STAFF = {
 }
 PIN_ADMIN = "0000" 
 
+# Nuova classificazione: exp (esperti) e bar (baristi)
 STAFF_INFO = {
-    'L': {'exp': True}, 'N': {'exp': True}, 'J': {'exp': True},
-    'A': {'exp': False}, 'B': {'exp': False}, 'C': {'exp': False},
-    'D': {'exp': False}, 'M': {'exp': False}, 'P': {'exp': False},
-    'T': {'exp': False}, 'Z': {'exp': False}
+    'L': {'exp': True, 'bar': True}, 
+    'N': {'exp': True, 'bar': False}, 
+    'J': {'exp': True, 'bar': True},
+    'A': {'exp': False, 'bar': True}, 
+    'B': {'exp': False, 'bar': False}, 
+    'C': {'exp': False, 'bar': False},
+    'D': {'exp': False, 'bar': False}, 
+    'M': {'exp': False, 'bar': False}, 
+    'P': {'exp': False, 'bar': False},
+    'T': {'exp': False, 'bar': False}, 
+    'Z': {'exp': False, 'bar': True}
 }
 STAFF_NAMES = list(STAFF_INFO.keys())
 
+# Formato: (Numero Totale, Numero Esperti, Numero Baristi)
 REQUISITI_SETTIMANA = {
-    'Mon': {'C': (3, 0)}, 'Tue': {'C': (2, 0)}, 'Wed': {'C': (3, 0)}, 
-    'Thu': {'C': (4, 0)}, 'Fri': {'C': (4, 0)}, 
-    'Sat': {'P': (3, 0), 'C': (6, 2)},
-    'Sun': {'P': (5, 2), 'C': (4, 0)}
+    'Mon': {'C': (3, 1, 1)}, 
+    'Tue': {'C': (2, 1, 1)}, 
+    'Wed': {'C': (3, 1, 0)}, 
+    'Thu': {'C': (4, 1, 1)}, 
+    'Fri': {'C': (4, 2, 0)}, # 0 Baristi di Venerdì come da tua richiesta
+    'Sat': {'P': (3, 2, 0), 'C': (6, 2, 1)},
+    'Sun': {'P': (5, 2, 0), 'C': (4, 1, 1)}
+}
+
+# Formato Eccezioni: (Totale, Esperti, Baristi)
+ECCEZIONI_GIORNI = {
+    '06/04': {'P': (4, 1, 0), 'C': (4, 1, 1)} 
 }
 
 GIORNI_IT = {0: 'L', 1: 'M', 2: 'M', 3: 'G', 4: 'V', 5: 'S', 6: 'D'}
@@ -43,7 +61,6 @@ def get_calendar_days(month, year):
     start_date = first_day - timedelta(days=first_day.weekday())
     return [start_date + timedelta(days=i) for i in range(35)]
 
-# Funzione per colorare le domeniche
 def highlight_dom(row):
     if 'Giorno' in row and str(row['Giorno']).startswith('D'):
         return ['background-color: #4a1515; font-weight: bold'] * len(row)
@@ -98,8 +115,14 @@ with tab1:
                         mapping = {"Mon":"Mon", "Tue":"Tue", "Wed":"Wed", "Thu":"Thu", "Fri":"Fri", "Sat":"Sat", "Sun":"Sun"}
                         day_key = mapping[dow]
                         
-                        st.write(f"**{date_str}**")
-                        for t in list(REQUISITI_SETTIMANA[day_key].keys()):
+                        if date_str in ECCEZIONI_GIORNI:
+                            config_giorno = ECCEZIONI_GIORNI[date_str]
+                            st.write(f"**{date_str}** ⚠️") 
+                        else:
+                            config_giorno = REQUISITI_SETTIMANA[day_key]
+                            st.write(f"**{date_str}**")
+                            
+                        for t in list(config_giorno.keys()):
                             id_turno_corrente = f"{date_str}-{t}"
                             gia_selezionato = id_turno_corrente in miei_turni_salvati
                             
@@ -137,7 +160,6 @@ with tab2:
         mese, anno = 4, 2026
         month_days = [d for d in get_calendar_days(mese, anno) if d.month == mese]
         
-        # Lettura databases
         try:
             df_indisp = conn.read(worksheet="indisponibilita", ttl=0)
         except:
@@ -148,7 +170,6 @@ with tab2:
         except:
             df_tabellone = pd.DataFrame()
 
-        # --- SEZIONE DISPONIBILITA' ---
         with st.expander("Vedi Dettaglio Disponibilità Staff", expanded=False):
             dati_disponibili = []
             conteggio_disp = {n: 0 for n in STAFF_NAMES}
@@ -156,7 +177,11 @@ with tab2:
             for d in month_days:
                 date_str = d.strftime("%d/%m")
                 day_key = d.strftime("%a")
-                config = REQUISITI_SETTIMANA.get(day_key, {})
+                
+                if date_str in ECCEZIONI_GIORNI:
+                    config = ECCEZIONI_GIORNI[date_str]
+                else:
+                    config = REQUISITI_SETTIMANA.get(day_key, {})
                 
                 for fascia in config.keys():
                     if not df_indisp.empty:
@@ -171,24 +196,38 @@ with tab2:
                     dati_disponibili.append({"Data": date_str, "Turno": fascia, "Staff Disponibile": ", ".join(disponibili)})
                     
             df_disp = pd.DataFrame(dati_disponibili)
-            df_conteggio = pd.DataFrame(list(conteggio_disp.items()), columns=['Lettera', 'Turni Liberi']).sort_values(by='Turni Liberi', ascending=False)
+            df_conteggio_disp = pd.DataFrame(list(conteggio_disp.items()), columns=['Lettera', 'Turni Liberi']).sort_values(by='Turni Liberi', ascending=False)
             
-            col_tab, col_count = st.columns([3, 1])
-            with col_tab:
+            col_tab_disp, col_count_disp = st.columns([3, 1])
+            with col_tab_disp:
                 st.dataframe(df_disp, use_container_width=True, height=250)
-            with col_count:
-                st.dataframe(df_conteggio, use_container_width=True, hide_index=True)
+            with col_count_disp:
+                st.dataframe(df_conteggio_disp, use_container_width=True, hide_index=True)
 
         st.divider()
 
-        # --- SEZIONE TABELLONE PERMANENTE ---
-        st.subheader("Tabellone Attuale")
+        st.subheader("Tabellone Attuale e Riepilogo Assegnazioni")
+        
         if not df_tabellone.empty and "Giorno" in df_tabellone.columns:
-            st.dataframe(df_tabellone.style.apply(highlight_dom, axis=1), use_container_width=True, hide_index=True)
+            conteggio_assegnati = {n: 0 for n in STAFF_NAMES}
+            for _, row in df_tabellone.iterrows():
+                for col in ["CENA", "PRANZO"]:
+                    valore_cella = str(row[col]) if pd.notna(row[col]) else ""
+                    for lettera in valore_cella:
+                        if lettera in conteggio_assegnati:
+                            conteggio_assegnati[lettera] += 1
+                            
+            df_assegnati = pd.DataFrame(list(conteggio_assegnati.items()), columns=['Lettera', 'Assegnati']).sort_values(by='Assegnati', ascending=False)
+            
+            col_tab_perm, col_riep_perm = st.columns([3, 1])
+            with col_tab_perm:
+                st.dataframe(df_tabellone.style.apply(highlight_dom, axis=1), use_container_width=True, hide_index=True)
+            with col_riep_perm:
+                st.write("Turni Effettivi")
+                st.dataframe(df_assegnati, use_container_width=True, hide_index=True)
         else:
             st.info("Nessun tabellone generato. Premi il tasto qui sotto per crearne uno nuovo.")
 
-        # --- AZIONE: GENERAZIONE TURNI ---
         if st.button("🚀 RIGENERA E SALVA TURNI DEL MESE", type="primary"):
             carico_lavoro = {name: 0 for name in STAFF_NAMES}
             tabellone_mese = {}
@@ -200,21 +239,52 @@ with tab2:
             for d in month_days:
                 date_str = d.strftime("%d/%m")
                 day_key = d.strftime("%a")
-                config = REQUISITI_SETTIMANA.get(day_key, {})
+                
+                if date_str in ECCEZIONI_GIORNI:
+                    config = ECCEZIONI_GIORNI[date_str]
+                else:
+                    config = REQUISITI_SETTIMANA.get(day_key, {})
 
-                for fascia, (n_tot, n_exp) in config.items():
+                for fascia, (n_tot, n_exp, n_bar) in config.items():
                     occupati = df_indisp[(df_indisp['Data'] == date_str) & (df_indisp['Turno'] == fascia)]['Nome'].tolist() if not df_indisp.empty else []
                     disponibili = [n for n in STAFF_NAMES if n not in occupati]
+                    scelti = []
                     
+                    # 1. Scelta Esperti
                     esperti_disp = [n for n in disponibili if STAFF_INFO[n]['exp']]
+                    random.shuffle(esperti_disp)
                     esperti_disp.sort(key=lambda x: carico_lavoro[x]) 
-                    scelti = esperti_disp[:n_exp]
+                    scelti_exp = esperti_disp[:n_exp]
+                    scelti.extend(scelti_exp)
                     
+                    # 2. Scelta Baristi (verificando quanti baristi sono già stati scelti tra gli esperti)
+                    bar_attuali = sum(1 for x in scelti if STAFF_INFO[x]['bar'])
+                    bar_mancanti = max(0, n_bar - bar_attuali)
+                    
+                    bar_disp = [n for n in disponibili if n not in scelti and STAFF_INFO[n]['bar']]
+                    random.shuffle(bar_disp)
+                    bar_disp.sort(key=lambda x: carico_lavoro[x])
+                    scelti_bar = bar_disp[:bar_mancanti]
+                    scelti.extend(scelti_bar)
+                    
+                    # 3. Riempimento turni rimanenti e blocco T/B
+                    mancanti = n_tot - len(scelti)
                     restanti_disp = [n for n in disponibili if n not in scelti]
+                    random.shuffle(restanti_disp)
                     restanti_disp.sort(key=lambda x: carico_lavoro[x])
                     
-                    mancanti = n_tot - len(scelti)
-                    scelti.extend(restanti_disp[:mancanti])
+                    for r in restanti_disp:
+                        if mancanti <= 0:
+                            break
+                            
+                        # BLOCCO T e B: Se c'è uno, l'altro salta il turno
+                        if r == 'T' and 'B' in scelti:
+                            continue
+                        if r == 'B' and 'T' in scelti:
+                            continue
+                            
+                        scelti.append(r)
+                        mancanti -= 1
                     
                     for s in scelti: carico_lavoro[s] += 1
                     
@@ -226,14 +296,13 @@ with tab2:
             try:
                 conn.update(worksheet="Tabellone", data=df_risultato_finale)
                 st.cache_data.clear()
-                st.rerun() # Forza il ricaricamento della pagina per mostrare i nuovi dati in alto
+                st.rerun() 
             except Exception as e:
                 st.error(f"❌ Errore di esportazione: {e}")
 
         st.divider()
         if st.button("🗑️ RESET DATABASE (NUOVO MESE)"):
             conn.update(worksheet="indisponibilita", data=pd.DataFrame(columns=["Nome", "Data", "Turno"]))
-            # Svuota anche il tabellone vecchio
             conn.update(worksheet="Tabellone", data=pd.DataFrame(columns=["Giorno", "CENA", "PRANZO"]))
             st.cache_data.clear()
             st.rerun()
