@@ -16,9 +16,9 @@ st.set_page_config(page_title="Turni Capitel", layout="wide")
 PIN_STAFF = {
     'L': '1111', 'N': '2222', 'J': '3333', 'A': '4444', 
     'B': '5555', 'C': '6972', 'D': '7777', 'M': '8888', 
-    'P': '9999', 'T': '1234', 'Z': '4321'
+    'P': '9999', 'T': '4723', 'Z': '0000'
 }
-PIN_ADMIN = "0000" 
+PIN_ADMIN = "3333" 
 
 # Nuova classificazione: exp (esperti) e bar (baristi)
 STAFF_INFO = {
@@ -41,15 +41,17 @@ REQUISITI_SETTIMANA = {
     'Mon': {'C': (3, 1, 1)}, 
     'Tue': {'C': (3, 1, 1)}, 
     'Wed': {'C': (3, 1, 0)}, 
-    'Thu': {'C': (4, 1, 1)}, 
+    'Thu': {'C': (3, 1, 1)}, 
     'Fri': {'C': (4, 2, 0)}, # 0 Baristi di Venerdì come da tua richiesta
-    'Sat': {'P': (3, 2, 0), 'C': (6, 2, 1)},
-    'Sun': {'P': (5, 2, 0), 'C': (4, 1, 1)}
+    'Sat': {'P': (3, 1, 0), 'C': (6, 2, 1)},
+    'Sun': {'P': (5, 2, 1), 'C': (4, 1, 0)}
 }
 
 # Formato Eccezioni: (Totale, Esperti, Baristi)
 ECCEZIONI_GIORNI = {
-    '06/04': {'P': (4, 1, 0), 'C': (4, 1, 1)} 
+    '05/04': {'P': (6, 2, 1), 'C': (4, 1, 1)},
+    '06/04': {'P': (3, 1, 1), 'C': (4, 1, 1)},
+    '25/04': {'P': (4, 2, 1), 'C': (6, 2, 1)}
 }
 
 GIORNI_IT = {0: 'L', 1: 'M', 2: 'M', 3: 'G', 4: 'V', 5: 'S', 6: 'D'}
