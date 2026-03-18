@@ -15,7 +15,7 @@ st.set_page_config(page_title="Turni Capitel", layout="wide")
 # --- DATABASE PIN E STAFF ---
 PIN_STAFF = {
     'L': '1111', 'N': '2222', 'J': '3333', 'A': '4444', 
-    'B': '5555', 'C': '6666', 'D': '7777', 'M': '8888', 
+    'B': '5555', 'C': '6972', 'D': '7777', 'M': '8888', 
     'P': '9999', 'T': '1234', 'Z': '4321'
 }
 PIN_ADMIN = "0000" 
